@@ -1,0 +1,305 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  One EC2 instance running two things: nginx serving the static frontend
+  (downloaded from a public GitHub repo at boot, refreshed over SSH after
+  each deploy), and a Node/Express backend running as a systemd service.
+  nginx reverse-proxies /api/* to the backend on localhost:4000, so only
+  port 80 needs to be open to the world.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Names the resources and is printed on the page
+
+  GitHubUser:
+    Type: String
+    Description: GitHub username that owns the repo
+
+  GitHubRepo:
+    Type: String
+    Description: Name of the PUBLIC repo containing frontend/ and backend/
+
+  GitBranch:
+    Type: String
+    Description: Branch this server serves. dev server -> dev, prod server -> main
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: >-
+      A subnet whose route table has 0.0.0.0/0 pointing at an internet gateway. The
+      workflow verifies this before deploying, so you never have to check by hand.
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    # Inside both lab guardrails: Ec2RestrictInstanceTypes allows nano/micro/small/medium.
+    AllowedValues: [t2.nano, t2.micro, t2.small, t3.nano, t3.micro, t3.small]
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: vockey
+    Description: The key pair the Learner Lab gives you. The deploy workflow uses it for SSH
+
+  SshCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: >-
+      Who may SSH on port 22. GitHub-hosted runners have no fixed IP address, so this has
+      to stay open for the deploy step to work. Acceptable in a lab, never in production.
+
+Resources:
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Web server ${EnvironmentName}'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP from anywhere (nginx - static frontend and api proxy)
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SshCidr
+          Description: SSH for the deploy workflow
+        # Port 4000 is intentionally NOT opened here. The backend only needs to be
+        # reachable from nginx on the same box (localhost), never from the internet.
+      Tags:
+        - {Key: Name, Value: !Sub '${EnvironmentName}-web-sg'}
+
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref SubnetId
+          GroupSet:
+            - !Ref WebSecurityGroup
+          DeleteOnTermination: true
+      # No IamInstanceProfile on purpose: the lab policy grants no iam:PassRole, so attaching
+      # one fails. That also means no SSM agent, which is why the workflow deploys over SSH.
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 8
+            DeleteOnTermination: true
+            # Not encrypted on purpose: the lab policy only grants kms:ListAliases,
+            # not kms:CreateGrant/GenerateDataKey/Decrypt - the actions actually
+            # needed to encrypt a new volume with the default AWS-managed key.
+            # Setting Encrypted: true here would fail with a KMS access-denied
+            # error under this exact policy.
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      Tags:
+        - {Key: Name, Value: !Sub '${EnvironmentName}-web-server'}
+        - {Key: Environment, Value: !Ref EnvironmentName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+          set -x
+
+          WEBROOT=/usr/share/nginx/html
+          BACKEND_DIR=/opt/backend
+          echo "${EnvironmentName}" > /etc/site-env
+
+          echo "=== [1/7] swap file (t3.micro has 1GB RAM; native module builds need headroom) ==="
+          if [ ! -f /swapfile ]; then
+            fallocate -l 1G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+
+          echo "=== [2/7] install nginx + nodejs + build tools (retried: dnf mirrors are flaky at boot) ==="
+          for attempt in 1 2 3 4 5; do
+            dnf install -y nginx nodejs npm gcc-c++ make python3 && break
+            echo "attempt $attempt failed, retrying in 10s"
+            sleep 10
+          done
+          mkdir -p $WEBROOT
+          mkdir -p $BACKEND_DIR/routes
+
+          echo "=== [3/7] install the frontend render script ==="
+          cat > /usr/local/bin/render-site.sh <<'RENDER'
+          #!/bin/bash
+          # Usage: render-site.sh [git-ref]   (branch name or commit sha)
+          set -uo pipefail
+          REF=$*
+          [ -n "$REF" ] || REF=main
+          WEBROOT=/usr/share/nginx/html
+          ENVNAME=$(cat /etc/site-env 2>/dev/null || echo unknown)
+          BASE="https://raw.githubusercontent.com/${GitHubUser}/${GitHubRepo}/$REF"
+          PREFIX="frontend"
+          FILES="index.html submit.html profile.html css/styles.css js/issueStore.js js/dateHelpers.js js/statusBadge.js js/navbar.js js/home.js js/submit.js js/profile.js"
+
+          printf 'ok\n' > $WEBROOT/health
+
+          GOT=""
+          for f in $FILES; do
+            mkdir -p "/tmp/frontend-fetch/$(dirname "$f")"
+            if curl -fsS --retry 3 --retry-delay 2 -H 'Cache-Control: no-cache' \
+                 -o "/tmp/frontend-fetch/$f" "$BASE/$PREFIX/$f"; then
+              GOT="$GOT $f"
+            else
+              echo "not present in $REF: $PREFIX/$f"
+            fi
+          done
+          [ -n "$GOT" ] || { echo "nothing fetched - keeping the current frontend"; exit 0; }
+
+          TOKEN=$(curl -sS -X PUT http://169.254.169.254/latest/api/token \
+            -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')
+          META=http://169.254.169.254/latest/meta-data
+          IP=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" $META/public-ipv4 || echo unknown)
+          AZ=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" $META/placement/availability-zone || echo unknown)
+
+          if [ -f /tmp/frontend-fetch/index.html ]; then
+            SHORT=$(echo $REF | cut -c1-7)
+            sed -i "s|%%ENV%%|$ENVNAME|g; s|%%EC2_IP%%|$IP|g; s|%%EC2_AZ%%|$AZ|g; s|%%GIT_REF%%|$SHORT|g" /tmp/frontend-fetch/index.html
+          fi
+
+          for f in $GOT; do
+            mkdir -p "$WEBROOT/$(dirname "$f")"
+            cp "/tmp/frontend-fetch/$f" "$WEBROOT/$f"
+          done
+          chown -R nginx:nginx $WEBROOT
+          echo "rendered frontend $REF ($ENVNAME) from $BASE"
+          RENDER
+          chmod 0755 /usr/local/bin/render-site.sh
+
+          echo "=== [4/7] install the backend render script ==="
+          cat > /usr/local/bin/render-backend.sh <<'RENDERBACKEND'
+          #!/bin/bash
+          # Usage: render-backend.sh [git-ref]   (branch name or commit sha)
+          # Pulls backend source, npm installs, restarts the service. Never touches
+          # tracker.db, so data survives every redeploy.
+          set -uo pipefail
+          REF=$*
+          [ -n "$REF" ] || REF=main
+          BACKEND_DIR=/opt/backend
+          BASE="https://raw.githubusercontent.com/${GitHubUser}/${GitHubRepo}/$REF"
+          PREFIX="backend"
+          FILES="package.json server.js db.js routes/issues.js routes/pins.js"
+
+          mkdir -p "$BACKEND_DIR/routes"
+
+          GOT=""
+          for f in $FILES; do
+            if curl -fsS --retry 3 --retry-delay 2 -H 'Cache-Control: no-cache' \
+                 -o "$BACKEND_DIR/$f" "$BASE/$PREFIX/$f"; then
+              GOT="$GOT $f"
+            else
+              echo "not present in $REF: $PREFIX/$f"
+            fi
+          done
+          [ -n "$GOT" ] || { echo "nothing fetched - keeping the current backend"; exit 0; }
+
+          cd "$BACKEND_DIR"
+          npm install --production --no-audit --no-fund
+
+          systemctl restart civicpulse-backend
+          sleep 2
+          systemctl is-active --quiet civicpulse-backend \
+            && echo "backend restarted OK on $REF" \
+            || { echo "backend failed to start - check: journalctl -u civicpulse-backend -n 50"; exit 1; }
+          RENDERBACKEND
+          chmod 0755 /usr/local/bin/render-backend.sh
+
+          echo "=== [5/7] first-time backend provision (fetch code, install, seed once) ==="
+          /usr/local/bin/render-backend.sh ${GitBranch} || echo "initial backend fetch had issues - check logs"
+
+          # Seed only if this is a brand-new database, never on redeploy.
+          if [ ! -f $BACKEND_DIR/tracker.db ] && [ -f $BACKEND_DIR/server.js ]; then
+            SEED_URL="https://raw.githubusercontent.com/${GitHubUser}/${GitHubRepo}/${GitBranch}/backend/seed.js"
+            if curl -fsS -o $BACKEND_DIR/seed.js "$SEED_URL"; then
+              (cd $BACKEND_DIR && node seed.js) || echo "seed script failed or not present - continuing without it"
+            fi
+          fi
+
+          echo "=== [6/7] systemd service for the backend ==="
+          cat > /etc/systemd/system/civicpulse-backend.service <<'SERVICE'
+          [Unit]
+          Description=CivicPulse Express backend
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/backend
+          ExecStart=/usr/bin/node /opt/backend/server.js
+          Restart=always
+          RestartSec=5
+          User=root
+          Environment=NODE_ENV=production
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+          systemctl daemon-reload
+          systemctl enable --now civicpulse-backend
+
+          echo "=== [7/7] nginx: static frontend + /api reverse proxy + no-cache ==="
+          cat > /etc/nginx/conf.d/nocache.conf <<'NOCACHE'
+          add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+          NOCACHE
+
+          cat > /etc/nginx/conf.d/api-proxy.conf <<'PROXY'
+          server {
+            listen 80 default_server;
+            root /usr/share/nginx/html;
+            index index.html;
+
+            location /api/ {
+              proxy_pass http://127.0.0.1:4000/api/;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            location / {
+              try_files $uri $uri/ =404;
+            }
+
+            location = /health {
+              default_type text/plain;
+              return 200 'ok\n';
+            }
+          }
+          PROXY
+          # Remove the AL2023 stock default server block so it doesn't fight ours on :80
+          rm -f /etc/nginx/conf.d/default.conf 2>/dev/null || true
+
+          cat > $WEBROOT/index.html <<'FALLBACK'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><title>My Site</title></head>
+          <body><h1>Starting up...</h1></body></html>
+          FALLBACK
+          printf 'ok\n' > $WEBROOT/health
+          systemctl enable --now nginx
+
+          /usr/local/bin/render-site.sh ${GitBranch}
+          nginx -t && systemctl reload nginx || systemctl restart nginx
+          echo "=== user-data complete ==="
+
+Outputs:
+  PublicIp:
+    Value: !GetAtt WebServer.PublicIp
+  URL:
+    Description: Open this in a browser (frontend + /api both served from here)
+    Value: !Sub 'http://${WebServer.PublicIp}'
+  SshCommand:
+    Value: !Sub 'ssh -i labsuser.pem ec2-user@${WebServer.PublicIp}'
