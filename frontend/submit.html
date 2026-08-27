@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit Issue - CivicPulse</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left" style="display:flex;align-items:center;gap:0.5rem;">
+      <a class="back-link" href="index.html" onclick="window.location.href='index.html'; return false;" style="margin-right:0.5rem;">
+        <span class="material-symbols-outlined">arrow_back</span>
+      </a>
+      <a class="logo" href="index.html">CivicPulse</a>
+    </div>
+  </div>
+</header>
+
+<main class="main-content narrow">
+  <div class="form-card">
+    <form class="form" id="issueForm">
+      <div class="form-group">
+        <label class="label">Evidence photo</label>
+        <div class="upload-zone" id="upload-zone">
+          <span class="material-symbols-outlined upload-icon">cloud_upload</span>
+          <p class="upload-title">Drag &amp; drop photo here</p>
+          <p class="upload-subtitle">or click to browse from device</p>
+          <p class="upload-hint">Max file size: 10MB. Formats: JPG, PNG.</p>
+        </div>
+        <input type="file" id="photo-input" accept="image/jpeg,image/png" style="display:none;">
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="title">Issue title</label>
+        <input class="text-input" id="title" name="title" placeholder="Brief description of the issue" type="text" required>
+      </div>
+
+      <div class="form-group">
+        <label class="label">Category</label>
+        <div class="category-grid" id="categoryGrid">
+          <button class="category-btn" data-category="Roads" type="button">
+            <span class="material-symbols-outlined">directions_car</span><span>Roads</span>
+          </button>
+          <button class="category-btn active" data-category="Electricity" type="button">
+            <span class="material-symbols-outlined">bolt</span><span>Electricity</span>
+          </button>
+          <button class="category-btn" data-category="Water" type="button">
+            <span class="material-symbols-outlined">water_drop</span><span>Water</span>
+          </button>
+          <button class="category-btn" data-category="Sanitation" type="button">
+            <span class="material-symbols-outlined">delete</span><span>Sanitation</span>
+          </button>
+          <button class="category-btn" data-category="Public Safety" type="button">
+            <span class="material-symbols-outlined">shield</span><span>Public Safety</span>
+          </button>
+          <button class="category-btn" data-category="Other" type="button">
+            <span class="material-symbols-outlined">apps</span><span>Other</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="map-header">
+          <label class="label">Select location</label>
+          <button class="location-btn" type="button" id="use-location-btn">
+            <span class="material-symbols-outlined">my_location</span> Use current location
+          </button>
+        </div>
+        <div id="map"></div>
+        <p class="map-hint">Tap the map to drop the pin at the issue's location.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="description">Detailed description</label>
+        <textarea class="text-input" id="description" name="description" placeholder="Provide additional details to help locate or understand the issue..." rows="4"></textarea>
+      </div>
+
+      <div class="submit-section">
+        <button class="post-btn" type="submit" id="post-btn">
+          Post issue <span class="material-symbols-outlined">send</span>
+        </button>
+        <p class="field-error hidden" id="form-error"></p>
+        <p class="disclaimer">By posting, you agree to our Terms of Service and confirm the accuracy of this report.</p>
+      </div>
+    </form>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <h2 class="footer-brand">CivicPulse</h2>
+      <p class="footer-copy">Empowering transparency and accountability in public infrastructure.</p>
+    </div>
+    <div class="footer-links">
+      <a class="footer-link" href="#">Privacy Policy</a>
+      <a class="footer-link" href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/issueStore.js"></script>
+<script src="js/dateHelpers.js"></script>
+<script src="js/statusBadge.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/submit.js"></script>
+</body>
+</html>
