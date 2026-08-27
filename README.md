@@ -1,11 +1,6 @@
 # CivicPulse
 CivicPulse is a civilian-driven platform for citizens and community advocates to track and publicise infrastructural issues with public properties and services using photos, locations, and community upvotes to demand accountability from local officials. 
 
-## Live Demo
-[View live site](https://civicpulse.github.io/civic-pulse)
-
-## Screenshots
-![Desktop view](docs/screenshot-desktop.png)
 
 ## Tech Stack
 | Layer | Technology |
