@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicPulse | Government Accountability Tracker </title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path clip-rule="evenodd" d="M12.0799 24L4 19.2479L9.95537 8.75216L18.04 13.4961L18.0446 4H29.9554L29.96 13.4961L38.0446 8.75216L44 19.2479L35.92 24L44 28.7521L38.0446 39.2479L29.96 34.5039L29.9554 44H18.0446L18.04 34.5039L9.95537 39.2479L4 28.7521L12.0799 24Z" fill="currentColor" fill-rule="evenodd"></path>
+      </svg>
+      CivicPulse
+    </div>
+    <div class="header-right">
+      <button class="btn-submit" onclick="window.location.href='submit.html'">
+        <span class="material-symbols-outlined">add</span> Submit
+      </button>
+      <a class="profile-link" href="profile.html">
+        <span class="material-symbols-outlined">account_circle</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="main-content">
+  <div class="sector-grid" id="sector-grid"></div>
+
+  <section class="trending-section">
+    <div class="trending-header">
+      <h3 class="trending-title" id="trending-title">Trending High-Priority</h3>
+    </div>
+    <div class="trending-stats hidden" id="trending-stats"></div>
+    <div class="trending-scroll" id="trending-scroll"></div>
+  </section>
+
+  <div class="controls-bar">
+    <div class="controls-left">
+      <div class="select-wrapper">
+        <select id="sort-select">
+          <option value="trending">Sort: Trending</option>
+          <option value="newest">Sort: Newest</option>
+          <option value="oldest">Sort: Oldest unresolved</option>
+        </select>
+      </div>
+      <div class="select-wrapper">
+        <select id="category-select">
+          <option value="">Filter: All Categories</option>
+          <option value="Roads">Roads</option>
+          <option value="Electricity">Electricity</option>
+          <option value="Water">Water</option>
+          <option value="Sanitation">Sanitation</option>
+          <option value="Public Safety">Public Safety</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    <p class="controls-right" id="results-count">Loading...</p>
+  </div>
+
+  <div class="issue-feed" id="issue-feed">
+    <p class="empty-state">Loading issues...</p>
+  </div>
+</main>
+
+<button class="fab" onclick="window.location.href='submit.html'">
+  <span class="material-symbols-outlined">add</span>
+</button>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <h2 class="footer-brand">CivicPulse</h2>
+      <p class="footer-copy">Empowering transparency and accountability in public infrastructure.</p>
+    </div>
+    <div class="footer-links">
+      <a class="footer-link" href="#">Privacy Policy</a>
+      <a class="footer-link" href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/issueStore.js"></script>
+<script src="js/dateHelpers.js"></script>
+<script src="js/statusBadge.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>

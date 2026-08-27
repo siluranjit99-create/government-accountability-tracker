@@ -1,0 +1,120 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicPulse - Profile &amp; Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <a class="back-link" href="index.html">
+      <span class="material-symbols-outlined">arrow_back</span>
+      <span>Profile</span>
+    </a>
+    <div class="header-right">
+      <button class="btn-submit" onclick="window.location.href='submit.html'">
+        <span class="material-symbols-outlined">add</span> Submit
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="main-content">
+
+  <!-- ===== Logged-out state ===== -->
+  <section class="section-card account-header" id="logged-out-view">
+    <div class="avatar-large"><span class="material-symbols-outlined">account_circle</span></div>
+    <div class="account-header-inner">
+      <h1 class="account-title">You're not logged in</h1>
+      <p class="account-subtitle">Log in to post, upvote, comment, and save issues.</p>
+      <button class="btn-primary" id="show-login-btn">Log in</button>
+    </div>
+  </section>
+
+  <section class="section-card login-form-section hidden" id="login-form-section">
+    <div class="login-form-inner">
+      <form id="login-form">
+        <input class="form-input" placeholder="Name" id="login-name" type="text">
+        <input class="form-input" placeholder="Email" id="login-email" type="email" required>
+        <input class="form-input" placeholder="Password" id="login-password" type="password" required>
+        <button class="btn-primary" type="submit" style="margin-bottom: 1rem;">Log in</button>
+      </form>
+      <p class="signup-text">This is a mocked login for demo purposes - any email/password works.</p>
+    </div>
+  </section>
+
+  <!-- ===== Logged-in state ===== -->
+  <section class="section-card profile-header hidden" id="logged-in-view">
+    <div class="profile-avatar-wrapper">
+      <div class="profile-avatar"><span class="material-symbols-outlined">account_circle</span></div>
+    </div>
+    <div class="profile-info">
+      <h1 class="profile-name" id="profile-name">Alex Johnson</h1>
+      <p class="profile-email" id="profile-email">alex.j@example.com</p>
+      <div class="profile-stats">
+        <div class="stat-box"><span class="stat-number" id="stat-posted">0</span><span class="stat-label">Posted</span></div>
+        <div class="stat-box"><span class="stat-number" id="stat-saved">0</span><span class="stat-label">Saved</span></div>
+      </div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn btn-secondary" id="logout-btn">Log out</button>
+    </div>
+  </section>
+
+  <section class="hidden" id="saved-issues-section" style="margin-bottom: 2rem;">
+    <h2 class="section-title"><span class="material-symbols-outlined">bookmark</span> Saved issues</h2>
+    <div class="issues-grid" id="saved-issues-grid"></div>
+  </section>
+
+  <!-- ===== About section (always visible) ===== -->
+  <section class="section-card">
+    <h2 class="about-title">About CivicPulse</h2>
+    <div class="about-grid">
+      <div>
+        <div class="about-content-block">
+          <h3 class="about-subtitle">Our mission</h3>
+          <p class="about-text">CivicPulse is dedicated to empowering transparency and unwavering accountability in public infrastructure. We believe in providing a clear, objective platform for citizens to report, track, and resolve local issues.</p>
+        </div>
+        <div class="about-content-block" style="margin-bottom: 0;">
+          <h3 class="about-subtitle">Resolution logic</h3>
+          <p class="about-text">An issue is marked solved once it reaches a confirmation threshold from other users, not just the original poster. Our data-driven approach ensures critical infrastructure needs are highlighted clearly to local authorities.</p>
+        </div>
+      </div>
+      <div class="legend-box">
+        <h3 class="about-subtitle" style="margin-bottom: 1rem;">Status legend</h3>
+        <ul class="legend-list">
+          <li class="legend-item"><span class="legend-dot green"></span><span class="legend-label">Green: Solved</span><span class="legend-desc">Issue closed.</span></li>
+          <li class="legend-item"><span class="legend-dot yellow"></span><span class="legend-label">Yellow: Recent</span><span class="legend-desc">0-14 days old.</span></li>
+          <li class="legend-item"><span class="legend-dot orange"></span><span class="legend-label">Orange: Moderate</span><span class="legend-desc">15-45 days old.</span></li>
+          <li class="legend-item"><span class="legend-dot red"></span><span class="legend-label" style="color:var(--error);">Red: Prolonged</span><span class="legend-desc">45+ days old.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <h2 class="footer-brand">CivicPulse</h2>
+      <p class="footer-copy">Empowering transparency and accountability in public infrastructure.</p>
+    </div>
+    <div class="footer-links">
+      <a class="footer-link" href="#">Privacy Policy</a>
+      <a class="footer-link" href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/issueStore.js"></script>
+<script src="js/dateHelpers.js"></script>
+<script src="js/statusBadge.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/profile.js"></script>
+</body>
+</html>
