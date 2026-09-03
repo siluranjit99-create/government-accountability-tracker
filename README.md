@@ -17,6 +17,8 @@ CivicPulse is a civilian-driven platform for citizens and community advocates to
 git clone  https://github.com/siluranjit99-create/government-accountability-tracker.git
 cd civic-pulse
 chmod +x setup.sh && ./setup.sh
+```
+
 # Open index.html in your browser
 
 ## Team 
